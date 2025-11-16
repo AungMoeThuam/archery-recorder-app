@@ -1,47 +1,39 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { api } from "../services/api";
 
 function LoginArcher() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
-    navigate('/archer/dashboard');
     e.preventDefault();
-    setError('');
-
-    if(email == 'emma.johnson@email.com'){
-        localStorage.setItem('userType', 'archer');
-        localStorage.setItem('archerID', 'emma11');
-        localStorage.setItem('archerName', 'emma');
-        navigate('/archer/dashboard');
-    }
+    setError("");
+    setLoading(true);
 
     try {
       // API call to verify archer credentials
-      const response = await fetch('/api/archer/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
+      const data = await api.loginArcher({ email, password });
 
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Store archer info in localStorage
-        localStorage.setItem('userType', 'archer');
-        localStorage.setItem('archerID', data.archerID);
-        localStorage.setItem('archerName', `${data.archerFirstName} ${data.archerLastName}`);
-        
-        // Redirect to archer dashboard
-        navigate('/archer/dashboard');
-      } else {
-        setError('Invalid email or password');
-      }
+      // Store archer info in localStorage
+      localStorage.setItem("userType", "archer");
+      localStorage.setItem("archerID", data.archerID);
+      localStorage.setItem(
+        "archerName",
+        `${data.archerFirstName} ${data.archerLastName}`
+      );
+
+      // Redirect to archer dashboard
+      navigate("/archer/dashboard");
     } catch (err) {
-      setError('Login failed. Please try again.');
+      console.log(err);
+
+      setError(err.message || "Login failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,7 +44,9 @@ function LoginArcher() {
         <div className="text-center mb-6">
           <div className="text-6xl mb-2">🎯</div>
           <h2 className="text-3xl font-bold text-gray-800">Archer Login</h2>
-          <p className="text-gray-600 mt-2">Enter your credentials to continue</p>
+          <p className="text-gray-600 mt-2">
+            Enter your credentials to continue
+          </p>
         </div>
 
         {/* Error Message */}
@@ -94,9 +88,10 @@ function LoginArcher() {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Login as Archer
+            {loading ? "Logging in..." : "Login as Archer"}
           </button>
         </form>
 
@@ -109,7 +104,9 @@ function LoginArcher() {
 
         {/* Demo Credentials */}
         <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600 font-semibold mb-2">Demo Credentials:</p>
+          <p className="text-sm text-gray-600 font-semibold mb-2">
+            Demo Credentials:
+          </p>
           <p className="text-xs text-gray-500">Email: emma.johnson@email.com</p>
           <p className="text-xs text-gray-500">Password: mess5678</p>
         </div>

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { api } from "../../services/api";
 
 function ArcherDashboard() {
   const [archer, setArcher] = useState(null);
@@ -8,11 +9,11 @@ function ArcherDashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const archerID = localStorage.getItem('archerID');
-    const archerName = localStorage.getItem('archerName');
-    
+    const archerID = localStorage.getItem("archerID");
+    const archerName = localStorage.getItem("archerName");
+
     if (!archerID) {
-      navigate('/login/archer');
+      navigate("/login/archer");
       return;
     }
 
@@ -22,30 +23,43 @@ function ArcherDashboard() {
 
   const fetchCompetitions = async (archerID) => {
     try {
-      const response = await fetch(`/api/archer/${archerID}/competitions`);
-      const data = await response.json();
+      const data = await api.getArcherCompetition(archerID);
       setCompetitions(data);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching competitions:', error);
+      console.error("Error fetching competitions:", error);
       setLoading(false);
     }
   };
 
   const handleLogout = () => {
     localStorage.clear();
-    navigate('/');
+    navigate("/");
   };
 
   const getStatusBadge = (status) => {
     const badges = {
-      'pending': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: '⏳ Pending Verification' },
-      'confirmed': { bg: 'bg-green-100', text: 'text-green-800', label: '✅ Verified' },
-      'not_started': { bg: 'bg-gray-100', text: 'text-gray-800', label: '📝 Not Started' }
+      "In Progress": {
+        bg: "bg-yellow-100",
+        text: "text-yellow-800",
+        label: "⏳ Pending Verification",
+      },
+      Completed: {
+        bg: "bg-green-100",
+        text: "text-green-800",
+        label: "✅ Finished",
+      },
+      Upcoming: {
+        bg: "bg-gray-100",
+        text: "text-gray-800",
+        label: "📝 Not Started",
+      },
     };
-    const badge = badges[status] || badges['not_started'];
+    const badge = badges[status] || badges["not_started"];
     return (
-      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${badge.bg} ${badge.text}`}>
+      <span
+        className={`px-3 py-1 rounded-full text-sm font-semibold ${badge.bg} ${badge.text}`}
+      >
         {badge.label}
       </span>
     );
@@ -91,12 +105,16 @@ function ArcherDashboard() {
 
         {/* Competitions Section */}
         <div className="bg-white rounded-xl shadow-lg p-6">
-          <h3 className="text-2xl font-bold text-gray-800 mb-6">My Competitions</h3>
+          <h3 className="text-2xl font-bold text-gray-800 mb-6">
+            My Competitions
+          </h3>
 
           {competitions.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">🏹</div>
-              <p className="text-gray-600 text-lg">No competitions registered yet</p>
+              <p className="text-gray-600 text-lg">
+                No competitions registered yet
+              </p>
             </div>
           ) : (
             <div className="grid gap-4">
@@ -112,52 +130,111 @@ function ArcherDashboard() {
                       </h4>
                       <div className="text-sm text-gray-600 space-y-1">
                         <p>📍 {comp.competitionLocation}</p>
-                        <p>📅 {new Date(comp.competitionStartDate).toLocaleDateString()}</p>
+                        <p>
+                          📅{" "}
+                          {new Date(
+                            comp.competitionStartDate
+                          ).toLocaleDateString()}
+                        </p>
                       </div>
                     </div>
-                    {getStatusBadge(comp.status)}
+                    {getStatusBadge(comp.competitionStatus)}
                   </div>
 
                   {/* Rounds */}
-                  <div className="space-y-2 mb-4">
-                    <h5 className="font-semibold text-gray-700">Rounds:</h5>
-                    {comp.rounds && comp.rounds.map((round) => (
-                      <div key={round.roundID} className="bg-gray-50 p-3 rounded-lg">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <span className="font-semibold">{round.roundType}</span>
-                            <span className="text-gray-600 ml-2">
-                              • {new Date(round.date).toLocaleDateString()}
-                            </span>
-                          </div>
-                          {round.totalScore !== null ? (
-                            <div className="text-right">
-                              <div className="font-bold text-blue-600 text-lg">
-                                {round.totalScore}
+                  <div className="mb-6">
+                    <h5 className="font-semibold text-gray-700 mb-3 text-lg">
+                      Rounds
+                    </h5>
+                    {comp.rounds && comp.rounds.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {comp.rounds.map((round) => (
+                          <Link
+                            key={round.roundID}
+                            to={`/archer/round-ranking/${comp.competitionID}/${round.roundID}`}
+                            className="bg-linear-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 p-4 rounded-lg hover:shadow-lg hover:border-blue-400 transition-all cursor-pointer"
+                          >
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h6 className="font-bold text-gray-800 text-base">
+                                  {round.roundType}
+                                </h6>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  📅{" "}
+                                  {new Date(
+                                    round.roundDate
+                                  ).toLocaleDateString()}
+                                </p>
                               </div>
-                              <div className="text-xs text-gray-600">
-                                {round.totalX} X • {round.totalTen} 10s
-                              </div>
+                              {round.totalScore !== null && (
+                                <div className="bg-blue-600 text-white rounded-lg px-3 py-2 text-center">
+                                  <div className="text-2xl font-bold">
+                                    {round.totalScore}
+                                  </div>
+                                  <div className="text-xs">Points</div>
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <span className="text-gray-500 italic">No score yet</span>
-                          )}
-                        </div>
+
+                            {round.totalScore !== null ? (
+                              <div className="bg-white rounded p-2 flex justify-around text-center text-sm">
+                                <div>
+                                  <div className="font-semibold text-gray-700">
+                                    {round.totalX}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Bullseyes
+                                  </div>
+                                </div>
+                                <div className="border-l border-gray-300"></div>
+                                <div>
+                                  <div className="font-semibold text-gray-700">
+                                    {round.totalTen}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Perfect 10s
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-gray-100 text-gray-600 text-center py-2 rounded text-sm font-semibold">
+                                ⏳ No score entered
+                              </div>
+                            )}
+                            <div className="mt-3 text-center text-sm text-blue-600 font-semibold hover:text-blue-700">
+                              View Ranking →
+                            </div>
+                          </Link>
+                        ))}
                       </div>
-                    ))}
+                    ) : (
+                      <p className="text-gray-500 text-center py-4">
+                        No rounds available
+                      </p>
+                    )}
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-3">
-                    {comp.status === 'not_started' && (
-                      <Link
-                        to={`/archer/score-entry/${comp.competitionID}/${comp.rounds[0]?.roundID}`}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Enter Scores
-                      </Link>
+                  <div className="flex gap-3 flex-wrap">
+                    {comp.status === "not_started" && (
+                      <>
+                        <Link
+                          to={`/archer/score-entry/${comp.competitionID}/${comp.rounds[0]?.roundID}`}
+                          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                        >
+                          <span>✏️</span>
+                          Enter Scores Manually
+                        </Link>
+                        <Link
+                          to={`/archer/score-entry-photo/${comp.competitionID}/${comp.rounds[0]?.roundID}`}
+                          className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+                        >
+                          <span>📸</span>
+                          Enter Scores with Photo
+                        </Link>
+                      </>
                     )}
-                    {comp.status === 'pending' && (
+                    {comp.status === "pending" && (
                       <button
                         disabled
                         className="bg-yellow-500 text-white px-4 py-2 rounded-lg opacity-50 cursor-not-allowed"
@@ -165,7 +242,8 @@ function ArcherDashboard() {
                         Waiting for Verification
                       </button>
                     )}
-                    {(comp.status === 'confirmed' || comp.status === 'pending') && (
+                    {(comp.status === "confirmed" ||
+                      comp.status === "pending") && (
                       <Link
                         to={`/archer/scores/${comp.participationID}`}
                         className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"

@@ -1,21 +1,22 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { api } from "../../services/api";
 
 function RecorderDashboard() {
   const [recorder, setRecorder] = useState(null);
   const [competitions, setCompetitions] = useState([]);
-  const [selectedCompetition, setSelectedCompetition] = useState('');
+  const [selectedCompetition, setSelectedCompetition] = useState("");
   const [rounds, setRounds] = useState([]);
-  const [selectedRound, setSelectedRound] = useState('');
+  const [selectedRound, setSelectedRound] = useState("");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const recorderID = localStorage.getItem('recorderID');
-    const recorderName = localStorage.getItem('recorderName');
-    
+    const recorderID = localStorage.getItem("recorderID");
+    const recorderName = localStorage.getItem("recorderName");
+
     if (!recorderID) {
-      navigate('/login/recorder');
+      navigate("/login/recorder");
       return;
     }
 
@@ -25,31 +26,29 @@ function RecorderDashboard() {
 
   const fetchCompetitions = async () => {
     try {
-      const response = await fetch('/api/competitions');
-      const data = await response.json();
+      const data = await api.getCompetitions();
       setCompetitions(data);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching competitions:', error);
+      console.error("Error fetching competitions:", error);
       setLoading(false);
     }
   };
 
   const handleCompetitionChange = async (competitionId) => {
     setSelectedCompetition(competitionId);
-    setSelectedRound('');
-    
+    setSelectedRound("");
+
     if (!competitionId) {
       setRounds([]);
       return;
     }
 
     try {
-      const response = await fetch(`/api/competition/${competitionId}/rounds`);
-      const data = await response.json();
+      const data = await api.getCompetitionRounds(competitionId);
       setRounds(data);
     } catch (error) {
-      console.error('Error fetching rounds:', error);
+      console.error("Error fetching rounds:", error);
     }
   };
 
@@ -61,7 +60,7 @@ function RecorderDashboard() {
 
   const handleLogout = () => {
     localStorage.clear();
-    navigate('/');
+    navigate("/");
   };
 
   if (loading) {
@@ -79,7 +78,9 @@ function RecorderDashboard() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <span className="text-3xl">📋</span>
-            <h1 className="text-2xl font-bold text-gray-800">Recorder Portal</h1>
+            <h1 className="text-2xl font-bold text-gray-800">
+              Recorder Portal
+            </h1>
           </div>
           <button
             onClick={handleLogout}
@@ -104,7 +105,9 @@ function RecorderDashboard() {
 
         {/* Selection Form */}
         <div className="bg-white rounded-xl shadow-lg p-8">
-          <h3 className="text-2xl font-bold text-gray-800 mb-6">Select Competition & Round</h3>
+          <h3 className="text-2xl font-bold text-gray-800 mb-6">
+            Select Competition & Round
+          </h3>
 
           {/* Step 1: Select Competition */}
           <div className="mb-6">
@@ -119,7 +122,9 @@ function RecorderDashboard() {
               <option value="">-- Choose a competition --</option>
               {competitions.map((comp) => (
                 <option key={comp.competitionID} value={comp.competitionID}>
-                  {comp.title} - {new Date(comp.startDate).toLocaleDateString()} - {comp.location}
+                  {comp.competitionTitle} -{" "}
+                  {new Date(comp.competitionStartDate).toLocaleDateString()} -{" "}
+                  {comp.competitionCity}
                 </option>
               ))}
             </select>
@@ -140,13 +145,16 @@ function RecorderDashboard() {
                 <option value="">-- Choose a round --</option>
                 {rounds.map((round) => (
                   <option key={round.roundID} value={round.roundID}>
-                    {round.roundType} - {new Date(round.date).toLocaleDateString()}
+                    {round.roundType} -{" "}
+                    {new Date(round.date).toLocaleDateString()}
                   </option>
                 ))}
               </select>
-              
+
               {rounds.length === 0 && (
-                <p className="mt-2 text-sm text-gray-500">No rounds available for this competition</p>
+                <p className="mt-2 text-sm text-gray-500">
+                  No rounds available for this competition
+                </p>
               )}
             </div>
           )}

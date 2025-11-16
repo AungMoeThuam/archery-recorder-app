@@ -1,41 +1,44 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { api } from "../services/api";
 
 function LoginRecorder() {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
+    setLoading(true);
 
     try {
       // API call to verify recorder credentials
-      const response = await fetch('/api/recorder/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, email, password })
+      const data = await api.loginRecorder({
+        firstName,
+        lastName,
+        email,
+        password,
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Store recorder info in localStorage
-        localStorage.setItem('userType', 'recorder');
-        localStorage.setItem('recorderID', data.recorderID);
-        localStorage.setItem('recorderName', `${data.firstName} ${data.lastName}`);
-        
-        // Redirect to recorder dashboard
-        navigate('/recorder/dashboard');
-      } else {
-        setError('Invalid credentials');
-      }
+      // Store recorder info in localStorage
+      localStorage.setItem("userType", "recorder");
+      localStorage.setItem("recorderID", data.recorderID);
+      localStorage.setItem(
+        "recorderName",
+        `${data.firstName} ${data.lastName}`
+      );
+
+      // Redirect to recorder dashboard
+      navigate("/recorder/dashboard");
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError(err.message || "Login failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -116,9 +119,10 @@ function LoginRecorder() {
 
           <button
             type="submit"
-            className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+            disabled={loading}
+            className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Login as Recorder
+            {loading ? "Logging in..." : "Login as Recorder"}
           </button>
         </form>
 
@@ -131,8 +135,12 @@ function LoginRecorder() {
 
         {/* Demo Credentials */}
         <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600 font-semibold mb-2">Demo Credentials:</p>
-          <p className="text-xs text-gray-500">Create a test recorder in DB first</p>
+          <p className="text-sm text-gray-600 font-semibold mb-2">
+            Demo Credentials:
+          </p>
+          <p className="text-xs text-gray-500">
+            Create a test recorder in DB first
+          </p>
         </div>
       </div>
     </div>
