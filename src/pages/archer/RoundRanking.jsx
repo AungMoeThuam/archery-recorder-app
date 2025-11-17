@@ -230,7 +230,7 @@ function RoundRanking() {
         )}
 
         {/* Enter Score Buttons if eligible and no score for current archer */}
-        {eligibility?.eligible && !hasScore && (
+        {eligibility?.eligible && (
           <div className="mt-8 text-center">
             <div className="flex gap-4 justify-center">
               <Link

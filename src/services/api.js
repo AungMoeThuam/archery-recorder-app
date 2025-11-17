@@ -92,6 +92,13 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(verificationData),
     }).then(handleResponse),
+
+  confirmEndScore: (endScoreData) =>
+    fetch(`${API_BASE_URL}/api/recorder/round/update`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(endScoreData),
+    }).then(handleResponse),
 };
 
 export const API_ENDPOINTS = {

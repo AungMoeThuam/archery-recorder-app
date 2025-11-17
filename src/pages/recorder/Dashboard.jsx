@@ -146,7 +146,7 @@ function RecorderDashboard() {
                 {rounds.map((round) => (
                   <option key={round.roundID} value={round.roundID}>
                     {round.roundType} -{" "}
-                    {new Date(round.date).toLocaleDateString()}
+                    {new Date(round.roundDate).toLocaleDateString()}
                   </option>
                 ))}
               </select>

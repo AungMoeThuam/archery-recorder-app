@@ -18,19 +18,19 @@ function LoginRecorder() {
 
     try {
       // API call to verify recorder credentials
-      const data = await api.loginRecorder({
-        firstName,
-        lastName,
+      let data = await api.loginRecorder({
         email,
         password,
       });
+
+      console.log("recorder login - ", data);
 
       // Store recorder info in localStorage
       localStorage.setItem("userType", "recorder");
       localStorage.setItem("recorderID", data.recorderID);
       localStorage.setItem(
         "recorderName",
-        `${data.firstName} ${data.lastName}`
+        `${data.recorderFirstName} ${data.recorderLastName}`
       );
 
       // Redirect to recorder dashboard
@@ -61,34 +61,6 @@ function LoginRecorder() {
 
         {/* Login Form */}
         <form onSubmit={handleLogin}>
-          <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">
-              First Name
-            </label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="John"
-              required
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">
-              Last Name
-            </label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Smith"
-              required
-            />
-          </div>
-
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">
               Email Address

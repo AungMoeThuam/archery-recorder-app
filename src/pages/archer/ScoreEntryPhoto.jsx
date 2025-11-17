@@ -164,7 +164,6 @@ export default function ArcherScoreEntryPhoto() {
     const currentRangeId = scoresObj.ranges[currentRangeIndex].rangeID;
 
     setDetecting(true);
-    console.log("Sending photo to AI detection backend:", endData.photo);
 
     try {
       // 2. Prepare the FormData object for file upload
@@ -173,16 +172,12 @@ export default function ArcherScoreEntryPhoto() {
       formData.append("file", endData.photo);
 
       // 3. Construct the API endpoint URL
-      // NOTE: Update 'http://localhost:8000/api' to your actual base URL
-      const apiUrl = `http://localhost:8000/api/arrowStaging/1/detect`;
+      const apiUrl = `http://localhost:8000/api/archer/1/detect`;
 
       // 4. Send the POST request
       const response = await fetch(apiUrl, {
         method: "POST",
         body: formData,
-        // NOTE: Do NOT set the 'Content-Type' header here.
-        // When using FormData, the browser sets it correctly (as 'multipart/form-data')
-        // along with the necessary boundary.
       });
 
       if (!response.ok) {
@@ -322,7 +317,7 @@ export default function ArcherScoreEntryPhoto() {
         roundID: scoresObj.roundID,
         participationID: scoresObj.participationID,
         distance: scoresObj.ranges[rangeIndex].distance,
-        target: scoresObj.ranges[rangeIndex].target,
+        // target: scoresObj.ranges[rangeIndex].target,
         endOrder: endNum,
         arrows: endData.arrows,
         // The photo file itself is likely submitted with the scores in a real app,
@@ -333,10 +328,19 @@ export default function ArcherScoreEntryPhoto() {
 
       // Call API to submit end score
       // NOTE: Using the standard api.submitEndScore here.
-      const response = await api.submitEndScore(requestBody);
+      // const response = await api.submitEndScore(requestBody);
+      const response = await fetch("http://localhost:8000/api/archer/arrows", {
+        method: "POST",
+        body: JSON.stringify(requestBody),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-      if (response.recorded) {
-        console.log("End score recorded successfully:", response);
+      let data = await response.json();
+
+      if (data.status) {
+        console.log("End score recorded successfully:", data);
 
         // Mark end as submitted
         const updatedScores = JSON.parse(JSON.stringify(scoresObj));

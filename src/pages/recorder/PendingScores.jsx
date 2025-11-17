@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-// NOTE: Assuming api service is available as 'api' in the path '.../../services/api'
-// If not, you may need to replace 'api.submitFinalEndScore' with a standard fetch.
-// For this example, I will use a placeholder 'fetch' call directly.
+import { api } from "../../services/api";
 
 // Renamed for clarity in functionality, but this replaces the content of PendingScores.jsx
 function RecorderEndVerification() {
@@ -43,7 +41,8 @@ function RecorderEndVerification() {
 
   // Helper to calculate end score (X/10 count as 10, M as 0)
   const getEndScore = (arrows) => {
-    return arrows.reduce((sum, score) => {
+    return arrows.reduce((sum, arrow) => {
+      const score = arrow.arrowScore;
       // The backend returns numbers (e.g., 0, 1, 5) but also potentially strings for 'X'
       // If the backend returns 'X', it should be converted to 10 for sum.
       const val =
@@ -73,15 +72,18 @@ function RecorderEndVerification() {
 
       let endsData = await response.json();
 
+      console.log(endsData);
+
       // Enhance data with a unique key and an editable copy of scores
       setPendingEnds(
         endsData.map((end) => ({
           ...end,
           key: `${end.participationID}-${end.endOrder}-${end.roundID}`,
-          // Initialize an editable state for scores
-          editableArrows: end.arrows.map((score) =>
-            score === "X" ? 10 : score
-          ), // Ensure X is treated as 10 for editing/math simplicity if the input is X
+          // Initialize an editable state for scores with staging IDs
+          editableArrows: end.arrows.map((arrow) => ({
+            arrowStagingID: arrow.arrowStagingID,
+            arrowScore: arrow.arrowScore,
+          })),
         }))
       );
     } catch (error) {
@@ -97,8 +99,8 @@ function RecorderEndVerification() {
         if (end.key === endKey) {
           const newArrows = [...end.editableArrows];
 
-          // Convert 'X'/'10' to number 10, 'M' to 0, or keep original score type
-          // The Quick Entry options are strings. We should store them as numbers
+          // Convert 'X'/'10' to keep as 'X', 'M' to 0, or parse as number
+          // The Quick Entry options are strings. We should store them appropriately
           // for the final submission if the backend expects it.
           const scoreValue =
             newScore === "X"
@@ -109,7 +111,11 @@ function RecorderEndVerification() {
               ? 0
               : parseInt(newScore, 10);
 
-          newArrows[arrowIndex] = scoreValue;
+          // Update only the arrowScore, keep arrowStagingID
+          newArrows[arrowIndex] = {
+            ...newArrows[arrowIndex],
+            arrowScore: scoreValue,
+          };
 
           return { ...end, editableArrows: newArrows };
         }
@@ -119,7 +125,7 @@ function RecorderEndVerification() {
 
     // Move focus to next arrow
     const currentEnd = pendingEnds.find((e) => e.key === endKey);
-    if (currentEnd && arrowIndex < currentEnd.arrows.length - 1) {
+    if (currentEnd && arrowIndex < currentEnd.editableArrows.length - 1) {
       setCurrentArrow([
         currentEnd.participationID,
         currentEnd.endOrder,
@@ -143,36 +149,40 @@ function RecorderEndVerification() {
       endOrder: end.endOrder,
       distance: end.distance,
       participationID: end.participationID,
-      // Convert 10 back to 'X' for the highest score if that's the final submission format
-      arrows: end.editableArrows.map((score) => (score === 10 ? "X" : score)),
-      stagingStatus: "confirmed", // Assuming the action changes status to 'confirmed'
-      // NOTE: You would need to add the recorderID and time here in a real submission.
+      arrows: end.editableArrows.map((arrow) => ({
+        arrowStagingID: arrow.arrowStagingID,
+        arrowScore: arrow.arrowScore,
+      })),
+      stagingStatus: "confirmed",
     };
 
     try {
-      // Placeholder for the final submission API call (assuming a PUT/POST to a final endpoint)
-      // Example: await fetch(`/api/recorder/ends/confirm`, { method: 'POST', body: JSON.stringify(confirmedData) });
-
-      // --- Simulation ---
       console.log("Submitting final score:", confirmedData);
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      // --- End Simulation ---
 
-      // Remove the confirmed end from the list
-      setPendingEnds((prevEnds) => prevEnds.filter((e) => e.key !== end.key));
+      // Call API to confirm end score
+      const response = await api.confirmEndScore(confirmedData);
 
-      // Clear focus
-      if (editingEndId === end.key) {
-        setEditingEndId(null);
-        setCurrentArrow(null);
+      if (response.success) {
+        console.log("End score confirmed successfully:", response);
+
+        // Refresh the pending list
+        await fetchPendingEnds();
+
+        // Clear focus
+        if (editingEndId === end.key) {
+          setEditingEndId(null);
+          setCurrentArrow(null);
+        }
+
+        alert(
+          `End ${end.endOrder} for Participant ID ${end.participationID} confirmed successfully!`
+        );
+      } else {
+        alert("Failed to confirm end score. Please try again.");
       }
-
-      alert(
-        `End ${end.endOrder} for Participant ID ${end.participationID} confirmed successfully!`
-      );
     } catch (error) {
       console.error("Error confirming end score:", error);
-      alert("Failed to confirm end score. Please try again.");
+      alert(`Failed to confirm end score: ${error.message || "Unknown error"}`);
     }
   };
 
@@ -253,7 +263,8 @@ function RecorderEndVerification() {
 
                         {/* Arrow Scores (Editable Grid) */}
                         <div className="flex flex-1 gap-2 overflow-x-auto">
-                          {end.editableArrows.map((score, arrowIndex) => {
+                          {end.editableArrows.map((arrow, arrowIndex) => {
+                            const score = arrow.arrowScore;
                             const isFocused =
                               currentArrow &&
                               currentArrow[0] === end.participationID &&
@@ -262,21 +273,23 @@ function RecorderEndVerification() {
 
                             return (
                               <button
-                                key={arrowIndex}
+                                key={arrow.arrowStagingID}
                                 onClick={() => handleCellClick(end)(arrowIndex)}
                                 className={`w-12 h-12 border-2 rounded-lg flex items-center justify-center font-bold text-base transition-all ${
                                   isFocused
                                     ? "bg-red-500 text-white border-red-600 shadow-lg scale-105"
-                                    : score === 10
+                                    : score === 10 || score === "X"
                                     ? "bg-yellow-100 text-gray-800 border-yellow-300 hover:border-blue-400"
-                                    : score === 0
+                                    : score === 0 || score === "M"
                                     ? "bg-gray-200 text-gray-800 border-gray-300 hover:border-blue-400"
                                     : "bg-white text-gray-800 border-gray-300 hover:border-blue-400"
                                 }`}
                               >
-                                {score === 10
+                                {score === "X"
+                                  ? "X"
+                                  : score === 10
                                   ? "10"
-                                  : score === 0
+                                  : score === 0 || score === "M"
                                   ? "M"
                                   : score}
                               </button>

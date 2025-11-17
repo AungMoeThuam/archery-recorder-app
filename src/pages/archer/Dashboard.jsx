@@ -8,9 +8,6 @@ function ArcherDashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  setInterval(() => {
-    console.log(competitions);
-  }, 2000);
   useEffect(() => {
     const archerID = localStorage.getItem("archerID");
     const archerName = localStorage.getItem("archerName");
