@@ -78,6 +78,7 @@ export default function ArcherScoreEntry() {
       } else {
         // Initialize new structure
         const newScoresObj = {
+          participationID: parseInt(participationId),
           roundID: parseInt(roundId),
           ranges: rangeList.map((range) => {
             const arrowsPerEnd = range.rangeTotalArrowsPerEnd || 3;
