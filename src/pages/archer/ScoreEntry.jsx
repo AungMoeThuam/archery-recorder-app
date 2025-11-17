@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../services/api";
 
 export default function ArcherScoreEntry() {
-  const { competitionId, roundId } = useParams();
+  const { roundId, participationId } = useParams();
   const navigate = useNavigate();
 
   const [archer, setArcher] = useState(null);
@@ -50,7 +50,10 @@ export default function ArcherScoreEntry() {
 
       // Check eligibility first
       const archerID = localStorage.getItem("archerID");
-      const eligibilityData = await api.checkEligibility(archerID, roundId);
+      const eligibilityData = await api.checkEligibility(
+        participationId,
+        roundId
+      );
 
       if (!eligibilityData.eligible) {
         setNotEligible(true);

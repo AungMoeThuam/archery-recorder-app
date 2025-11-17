@@ -27,7 +27,7 @@ function App() {
         {/* Archer Routes */}
         <Route path="/archer/dashboard" element={<ArcherDashboard />} />
         <Route
-          path="/archer/score-entry/:competitionId/:roundId"
+          path="/archer/score-entry/:competitionId/:roundId/:participationId"
           element={<ArcherScoreEntry />}
         />
         <Route
