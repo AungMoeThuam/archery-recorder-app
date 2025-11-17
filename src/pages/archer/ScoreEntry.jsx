@@ -282,41 +282,59 @@ export default function ArcherScoreEntry() {
       return;
     }
 
-    // TODO: API call to submit end to backend
-    console.log("Submitting end:", {
-      rangeIndex,
-      endNum,
-      distance: scoresObj.ranges[rangeIndex].distance,
-      arrows: endData.arrows,
-    });
+    try {
+      // Prepare API request body
+      const requestBody = {
+        roundID: scoresObj.roundID,
+        participationID: scoresObj.participationID,
+        distance: scoresObj.ranges[rangeIndex].distance,
+        target: scoresObj.ranges[rangeIndex].target,
+        endOrder: endNum,
+        arrows: endData.arrows,
+      };
 
-    // Mark end as submitted
-    const updatedScores = JSON.parse(JSON.stringify(scoresObj));
-    updatedScores.ranges[rangeIndex].ends[endNum - 1].submitted = true;
-    setScoresObj(updatedScores);
+      console.log("Submitting end to backend:", requestBody);
 
-    // Save to localStorage
-    const storageKey = `scores_round_${roundId}`;
-    localStorage.setItem(storageKey, JSON.stringify(updatedScores));
+      // Call API to submit end score
+      const response = await api.submitEndScore(requestBody);
 
-    const currentRange = ranges[rangeIndex];
-    const totalEnds = currentRange.rangeTotalEnds || 1;
+      if (response.recorded) {
+        console.log("End score recorded successfully:", response);
 
-    // Check if this was the last end of the range
-    if (endNum === totalEnds) {
-      // Check if range is now complete
-      const allEndsSubmitted = updatedScores.ranges[rangeIndex].ends.every(
-        (end) => end.submitted
-      );
+        // Mark end as submitted
+        const updatedScores = JSON.parse(JSON.stringify(scoresObj));
+        updatedScores.ranges[rangeIndex].ends[endNum - 1].submitted = true;
+        setScoresObj(updatedScores);
 
-      if (allEndsSubmitted) {
-        // Show modal for range completion
-        setShowRangeCompleteModal(true);
+        // Save to localStorage
+        const storageKey = `scores_round_${roundId}`;
+        localStorage.setItem(storageKey, JSON.stringify(updatedScores));
+
+        const currentRange = ranges[rangeIndex];
+        const totalEnds = currentRange.rangeTotalEnds || 1;
+
+        // Check if this was the last end of the range
+        if (endNum === totalEnds) {
+          // Check if range is now complete
+          const allEndsSubmitted = updatedScores.ranges[rangeIndex].ends.every(
+            (end) => end.submitted
+          );
+
+          if (allEndsSubmitted) {
+            // Show modal for range completion
+            setShowRangeCompleteModal(true);
+          }
+        } else {
+          // Move to next end
+          setCurrentEnd(endNum + 1);
+          setCurrentArrow(1);
+        }
+      } else {
+        alert("Failed to record end score. Please try again.");
       }
-    } else {
-      // Move to next end
-      setCurrentEnd(endNum + 1);
-      setCurrentArrow(1);
+    } catch (error) {
+      console.error("Error submitting end score:", error);
+      alert(`Failed to submit end score: ${error.message || "Unknown error"}`);
     }
   };
 
