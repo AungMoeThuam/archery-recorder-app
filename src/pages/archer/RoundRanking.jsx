@@ -9,10 +9,10 @@ function RoundRanking() {
   const [error, setError] = useState("");
   const [eligibility, setEligibility] = useState(null);
   const navigate = useNavigate();
-  const { competitionID, roundID } = useParams();
+  const { competitionID, roundID, participantID } = useParams();
   const [currnetArcherID, setCurrentArcherID] = useState(null);
 
-  console.log("Params:", { competitionID, roundID });
+  console.log("Params:", { competitionID, roundID, participantID });
   useEffect(() => {
     const archerID = localStorage.getItem("archerID");
     if (!archerID) {
@@ -32,7 +32,7 @@ function RoundRanking() {
       // Fetch ranking data and eligibility in parallel
       const [data, eligibilityData] = await Promise.all([
         api.getRoundRanking(competitionID, roundID),
-        api.checkEligibility(archerID, roundID)
+        api.checkEligibility(participantID, roundID),
       ]);
 
       console.log("API response:", data);

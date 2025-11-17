@@ -39,7 +39,7 @@ function App() {
           element={<ArcherScoreDetails />}
         />
         <Route
-          path="/archer/round-ranking/:competitionID/:roundID"
+          path="/archer/round-ranking/:competitionID/:roundID/:participantID"
           element={<ArcherRoundRanking />}
         />
 

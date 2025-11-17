@@ -70,9 +70,9 @@ export const api = {
   getRoundRanges: (roundID) =>
     fetch(`${API_BASE_URL}/api/round/${roundID}/ranges`).then(handleResponse),
 
-  checkEligibility: (archerID, roundID) =>
+  checkEligibility: (participationID, roundID) =>
     fetch(
-      `${API_BASE_URL}/api/archer/round/eligibility?archerID=${archerID}&roundID=${roundID}`
+      `${API_BASE_URL}/api/archer/round/eligibility?participationID=${participationID}&roundID=${roundID}`
     ).then(handleResponse),
 
   // Recorder endpoints

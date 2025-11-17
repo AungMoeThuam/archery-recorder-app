@@ -8,6 +8,9 @@ function ArcherDashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  setInterval(() => {
+    console.log(competitions);
+  }, 2000);
   useEffect(() => {
     const archerID = localStorage.getItem("archerID");
     const archerName = localStorage.getItem("archerName");
@@ -151,7 +154,7 @@ function ArcherDashboard() {
                         {comp.rounds.map((round) => (
                           <Link
                             key={round.roundID}
-                            to={`/archer/round-ranking/${comp.competitionID}/${round.roundID}`}
+                            to={`/archer/round-ranking/${comp.competitionID}/${round.roundID}/${comp.participationID}`}
                             className="bg-linear-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 p-4 rounded-lg hover:shadow-lg hover:border-blue-400 transition-all cursor-pointer"
                           >
                             <div className="flex justify-between items-start mb-3">
