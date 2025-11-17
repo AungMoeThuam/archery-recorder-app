@@ -176,31 +176,6 @@ function ArcherDashboard() {
                               )}
                             </div>
 
-                            {round.totalScore !== null ? (
-                              <div className="bg-white rounded p-2 flex justify-around text-center text-sm">
-                                <div>
-                                  <div className="font-semibold text-gray-700">
-                                    {round.totalX}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    Bullseyes
-                                  </div>
-                                </div>
-                                <div className="border-l border-gray-300"></div>
-                                <div>
-                                  <div className="font-semibold text-gray-700">
-                                    {round.totalTen}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    Perfect 10s
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="bg-gray-100 text-gray-600 text-center py-2 rounded text-sm font-semibold">
-                                ⏳ No score entered
-                              </div>
-                            )}
                             <div className="mt-3 text-center text-sm text-blue-600 font-semibold hover:text-blue-700">
                               View Ranking →
                             </div>

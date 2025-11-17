@@ -7,6 +7,7 @@ function RoundRanking() {
   const [roundInfo, setRoundInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [eligibility, setEligibility] = useState(null);
   const navigate = useNavigate();
   const { competitionID, roundID } = useParams();
   const [currnetArcherID, setCurrentArcherID] = useState(null);
@@ -23,14 +24,23 @@ function RoundRanking() {
   }, [competitionID, roundID, navigate]);
 
   const fetchRoundRanking = async () => {
-    setCurrentArcherID(localStorage.getItem("archerID"));
+    const archerID = localStorage.getItem("archerID");
+    setCurrentArcherID(archerID);
     try {
       setLoading(true);
-      const data = await api.getRoundRanking(competitionID, roundID);
+
+      // Fetch ranking data and eligibility in parallel
+      const [data, eligibilityData] = await Promise.all([
+        api.getRoundRanking(competitionID, roundID),
+        api.checkEligibility(archerID, roundID)
+      ]);
+
       console.log("API response:", data);
+      console.log("Eligibility response:", eligibilityData);
 
       setRanking(data || []);
       setRoundInfo(data.roundInfo);
+      setEligibility(eligibilityData);
       setError("");
     } catch (err) {
       console.error("Error fetching ranking:", err);
@@ -219,8 +229,8 @@ function RoundRanking() {
           </div>
         )}
 
-        {/* Enter Score Buttons if no score for current archer */}
-        {!hasScore && (
+        {/* Enter Score Buttons if eligible and no score for current archer */}
+        {eligibility?.eligible && !hasScore && (
           <div className="mt-8 text-center">
             <div className="flex gap-4 justify-center">
               <Link
@@ -240,6 +250,15 @@ function RoundRanking() {
             </div>
             <div className="text-xs text-gray-500 mt-3">
               You have not entered a score for this round yet.
+            </div>
+          </div>
+        )}
+
+        {/* Not Eligible Message */}
+        {eligibility && !eligibility.eligible && (
+          <div className="mt-8 text-center">
+            <div className="bg-gray-100 border border-gray-300 text-gray-700 px-6 py-4 rounded-lg inline-block">
+              You are not participating in this round.
             </div>
           </div>
         )}

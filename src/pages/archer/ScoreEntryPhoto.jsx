@@ -12,6 +12,7 @@ export default function ArcherScoreEntryPhoto() {
   const [scoresObj, setScoresObj] = useState(null); // { roundID, ranges: [...] }
   const [currentRangeIndex, setCurrentRangeIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [notEligible, setNotEligible] = useState(false);
 
   useEffect(() => {
     const archerID = localStorage.getItem("archerID");
@@ -28,6 +29,16 @@ export default function ArcherScoreEntryPhoto() {
   async function fetchRoundDetails() {
     try {
       setLoading(true);
+
+      // Check eligibility first
+      const archerID = localStorage.getItem("archerID");
+      const eligibilityData = await api.checkEligibility(archerID, roundId);
+
+      if (!eligibilityData.eligible) {
+        setNotEligible(true);
+        setLoading(false);
+        return;
+      }
 
       const rangesData = await api.getRoundRanges(roundId);
       const rangeList = rangesData.ranges || [];
@@ -137,6 +148,28 @@ export default function ArcherScoreEntryPhoto() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-xl text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
+  if (notEligible) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md mx-4 text-center">
+          <div className="text-6xl mb-4">⛔</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            Not Eligible
+          </h2>
+          <p className="text-gray-600 mb-6">
+            You are not participating in this round.
+          </p>
+          <button
+            onClick={() => navigate("/archer/dashboard")}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
       </div>
     );
   }

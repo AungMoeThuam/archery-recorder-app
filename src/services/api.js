@@ -70,6 +70,11 @@ export const api = {
   getRoundRanges: (roundID) =>
     fetch(`${API_BASE_URL}/api/round/${roundID}/ranges`).then(handleResponse),
 
+  checkEligibility: (archerID, roundID) =>
+    fetch(
+      `${API_BASE_URL}/api/archer/round/eligibility?archerID=${archerID}&roundID=${roundID}`
+    ).then(handleResponse),
+
   // Recorder endpoints
   getPendingScores: () =>
     fetch(`${API_BASE_URL}/scores/pending`).then(handleResponse),

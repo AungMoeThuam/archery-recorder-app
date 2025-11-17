@@ -107,8 +107,10 @@ function LoginArcher() {
           <p className="text-sm text-gray-600 font-semibold mb-2">
             Demo Credentials:
           </p>
-          <p className="text-xs text-gray-500">Email: emma.johnson@email.com</p>
-          <p className="text-xs text-gray-500">Password: mess5678</p>
+          <p className="text-xs text-gray-500">
+            Email: amelia.martin@email.com
+          </p>
+          <p className="text-xs text-gray-500">Password: amel9013</p>
         </div>
       </div>
     </div>
