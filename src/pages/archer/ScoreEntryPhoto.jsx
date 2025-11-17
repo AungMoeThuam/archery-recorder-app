@@ -160,29 +160,57 @@ export default function ArcherScoreEntryPhoto() {
     const endData = scoresObj.ranges[currentRangeIndex].ends[endIndex];
     if (!endData.photo) return;
 
+    // 1. Get the range_id from the current state
+    const currentRangeId = scoresObj.ranges[currentRangeIndex].rangeID;
+
     setDetecting(true);
     console.log("Sending photo to AI detection backend:", endData.photo);
 
     try {
-      // --- Placeholder for actual API call ---
-      // In a real app, you would send endData.photo to an endpoint:
-      // const formData = new FormData();
-      // formData.append('image', endData.photo);
-      // const response = await api.detectScores(formData);
+      // 2. Prepare the FormData object for file upload
+      const formData = new FormData();
+      // The key 'file' must match the parameter name in the Python endpoint: async def create_detection(file: UploadFile, ...)
+      formData.append("file", endData.photo);
 
-      // --- Simulation: Simulate API delay and response ---
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      const simulatedScores = ["10", "X", "8", "5", "M", "9"].slice(
-        0,
-        endData.arrows.length
-      );
-      // --- End Simulation ---
+      // 3. Construct the API endpoint URL
+      // NOTE: Update 'http://localhost:8000/api' to your actual base URL
+      const apiUrl = `http://localhost:8000/api/arrowStaging/1/detect`;
+
+      // 4. Send the POST request
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        body: formData,
+        // NOTE: Do NOT set the 'Content-Type' header here.
+        // When using FormData, the browser sets it correctly (as 'multipart/form-data')
+        // along with the necessary boundary.
+      });
+
+      if (!response.ok) {
+        // Handle HTTP errors (e.g., 400, 500)
+        const errorText = await response.text();
+        throw new Error(
+          `Detection failed with status ${response.status}: ${errorText}`
+        );
+      }
+
+      // 5. Get the detected scores from the response
+      const detectedScores = await response.json();
+
+      // Ensure detectedScores is an array of scores (e.g., ["10", "X", "8", "5", "M", "9"])
+      if (!Array.isArray(detectedScores)) {
+        throw new Error("Backend did not return a valid list of scores.");
+      }
+
+      // --- Use the actual detected scores ---
+      const receivedScores = detectedScores.slice(0, endData.arrows.length);
+
+      // --- End Actual API call ---
 
       // Update state with detected scores
       const updatedScores = JSON.parse(JSON.stringify(scoresObj));
       const updatedEnd = updatedScores.ranges[currentRangeIndex].ends[endIndex];
 
-      updatedEnd.arrows = simulatedScores;
+      updatedEnd.arrows = receivedScores;
       updatedEnd.scoresDetected = true;
       setScoresObj(updatedScores);
 
