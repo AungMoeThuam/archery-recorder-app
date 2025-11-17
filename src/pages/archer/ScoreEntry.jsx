@@ -177,14 +177,13 @@ export default function ArcherScoreEntry() {
   const handleCellClick = (rangeIndex, endNum, arrowIdx) => {
     const endData = scoresObj.ranges[rangeIndex].ends[endNum - 1];
 
-    // Don't allow clicking on submitted ends
+    // Don't allow clicking on submitted ends (do nothing silently)
     if (endData.submitted) {
       return;
     }
 
-    // Don't allow clicking on locked ends
+    // Don't allow clicking on locked ends (do nothing silently)
     if (!isEndUnlocked(rangeIndex, endNum)) {
-      alert("Please submit the previous end first!");
       return;
     }
 
@@ -415,38 +414,65 @@ export default function ArcherScoreEntry() {
             {ranges.map((range, index) => {
               const isActive = currentRangeIndex === index;
               const rangeStats = getRangeStats(index);
-              const isCurrentComplete = isRangeComplete(currentRangeIndex);
-              const canSwitch = isActive || isCurrentComplete;
               const isCompleted = isRangeComplete(index);
+
+              // Range is unlocked if:
+              // 1. It's the first range (index 0), OR
+              // 2. All previous ranges are complete
+              let isUnlocked = index === 0;
+              if (index > 0) {
+                isUnlocked = true;
+                for (let i = 0; i < index; i++) {
+                  if (!isRangeComplete(i)) {
+                    isUnlocked = false;
+                    break;
+                  }
+                }
+              }
 
               return (
                 <button
                   key={range.rangeID}
                   onClick={() => {
-                    if (!canSwitch) {
-                      alert(
-                        "Please complete the current range before switching!"
-                      );
-                      return;
+                    if (!isUnlocked) {
+                      return; // Do nothing if locked
                     }
                     setCurrentRangeIndex(index);
-                    setCurrentEnd(1);
+
+                    // Find first unsubmitted end in this range
+                    let targetEndNum = 1;
+                    const rangeData = scoresObj.ranges[index];
+                    for (let j = 0; j < rangeData.ends.length; j++) {
+                      if (!rangeData.ends[j].submitted) {
+                        targetEndNum = rangeData.ends[j].endOrder;
+                        break;
+                      }
+                    }
+
+                    setCurrentEnd(targetEndNum);
                     setCurrentArrow(1);
                   }}
-                  disabled={!canSwitch}
+                  disabled={!isUnlocked}
                   className={
                     "flex-1 px-6 py-4 font-semibold transition-all " +
                     (isActive
                       ? "bg-blue-600 text-white border-b-4 border-blue-800"
-                      : canSwitch
+                      : isCompleted
+                      ? "bg-green-50 text-gray-700 hover:bg-green-100 border-b-2 border-green-300"
+                      : isUnlocked
                       ? "text-gray-700 hover:bg-gray-100"
-                      : "text-gray-400 cursor-not-allowed opacity-50")
+                      : "text-gray-400 cursor-not-allowed opacity-50 bg-gray-100")
                   }
                 >
                   <div className="flex items-center justify-center gap-2">
-                    <span className="text-lg">{range.rangeDistance}m</span>
+                    {!isUnlocked && <span className="text-xl">🔒</span>}
+                    <span className="text-lg">{range.rangeDistance}</span>
                     {isCompleted && (
-                      <span className="text-green-500 text-xl">✓</span>
+                      <span
+                        className={isActive ? "text-white" : "text-green-600"}
+                      >
+                        ✓
+                      </span>
                     )}
                   </div>
                   <div className="text-sm mt-1 opacity-90">
