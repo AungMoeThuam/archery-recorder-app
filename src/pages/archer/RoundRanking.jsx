@@ -241,7 +241,7 @@ function RoundRanking() {
                 Enter Scores Manually
               </Link>
               <Link
-                to={`/archer/score-entry-photo/${competitionID}/${roundID}`}
+                to={`/archer/score-entry-photo/${competitionID}/${roundID}/${participantID}`}
                 className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-semibold shadow-md"
               >
                 <span>📸</span>

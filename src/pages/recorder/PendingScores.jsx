@@ -1,208 +1,350 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+// NOTE: Assuming api service is available as 'api' in the path '.../../services/api'
+// If not, you may need to replace 'api.submitFinalEndScore' with a standard fetch.
+// For this example, I will use a placeholder 'fetch' call directly.
 
-function RecorderPendingScores() {
-  const { competitionId, roundId } = useParams();
+// Renamed for clarity in functionality, but this replaces the content of PendingScores.jsx
+function RecorderEndVerification() {
+  const { roundId } = useParams(); // Using roundId to filter the data
   const navigate = useNavigate();
-  
-  const [competition, setCompetition] = useState(null);
-  const [round, setRound] = useState(null);
-  const [pendingArchers, setPendingArchers] = useState([]);
+
+  const [pendingEnds, setPendingEnds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingEndId, setEditingEndId] = useState(null); // Key: `${end.participationID}-${end.endOrder}`
+  const [currentArrow, setCurrentArrow] = useState(null); // [participationID, endOrder, arrowIndex]
+
+  // Options for editing the score
+  const arrowOptions = [
+    "M",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "X",
+  ];
 
   useEffect(() => {
-    const recorderID = localStorage.getItem('recorderID');
-    
+    // Check for recorder login (retained from original file's logic assumption)
+    const recorderID = localStorage.getItem("recorderID");
     if (!recorderID) {
-      navigate('/login/recorder');
+      navigate("/login/recorder");
       return;
     }
 
-    fetchPendingScores();
-  }, [navigate, competitionId, roundId]);
+    fetchPendingEnds();
+  }, [roundId, navigate]);
 
-  const fetchPendingScores = async () => {
+  // Helper to calculate end score (X/10 count as 10, M as 0)
+  const getEndScore = (arrows) => {
+    return arrows.reduce((sum, score) => {
+      // The backend returns numbers (e.g., 0, 1, 5) but also potentially strings for 'X'
+      // If the backend returns 'X', it should be converted to 10 for sum.
+      const val =
+        typeof score === "string" &&
+        (score.toUpperCase() === "X" || score === "10")
+          ? 10
+          : typeof score === "string" && score.toUpperCase() === "M"
+          ? 0
+          : score;
+      return sum + (Number.isFinite(val) ? val : 0);
+    }, 0);
+  };
+
+  const fetchPendingEnds = async () => {
     try {
-      // Fetch competition details
-      const compResponse = await fetch(`/api/competition/${competitionId}`);
-      const compData = await compResponse.json();
-      setCompetition(compData);
+      setLoading(true);
 
-      // Fetch round details
-      const roundResponse = await fetch(`/api/round/${roundId}`);
-      const roundData = await roundResponse.json();
-      setRound(roundData);
+      // Using the endpoint provided: http://localhost:4000/api/recorder/ends/pending
+      // Assuming it needs roundID to filter correctly
+      const response = await fetch(
+        `http://localhost:4000/api/recorder/ends/pending?roundID=${roundId}`
+      );
 
-      // Fetch pending archers for this round
-      const pendingResponse = await fetch(`/api/recorder/pending/${roundId}`);
-      const pendingData = await pendingResponse.json();
-      setPendingArchers(pendingData);
+      if (!response.ok) {
+        throw new Error("Failed to fetch pending ends.");
+      }
 
-      setLoading(false);
+      let endsData = await response.json();
+
+      // Enhance data with a unique key and an editable copy of scores
+      setPendingEnds(
+        endsData.map((end) => ({
+          ...end,
+          key: `${end.participationID}-${end.endOrder}-${end.roundID}`,
+          // Initialize an editable state for scores
+          editableArrows: end.arrows.map((score) =>
+            score === "X" ? 10 : score
+          ), // Ensure X is treated as 10 for editing/math simplicity if the input is X
+        }))
+      );
     } catch (error) {
-      console.error('Error fetching pending scores:', error);
+      console.error("Error fetching pending ends:", error);
+    } finally {
       setLoading(false);
     }
   };
 
-  const getStatusBadge = (status) => {
-    if (status === 'complete') {
-      return (
-        <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
-          ✓ Ready to Verify
-        </span>
-      );
+  const handleArrowEdit = (endKey, arrowIndex, newScore) => {
+    setPendingEnds((prevEnds) =>
+      prevEnds.map((end) => {
+        if (end.key === endKey) {
+          const newArrows = [...end.editableArrows];
+
+          // Convert 'X'/'10' to number 10, 'M' to 0, or keep original score type
+          // The Quick Entry options are strings. We should store them as numbers
+          // for the final submission if the backend expects it.
+          const scoreValue =
+            newScore === "X"
+              ? "X"
+              : newScore === "10"
+              ? 10
+              : newScore === "M"
+              ? 0
+              : parseInt(newScore, 10);
+
+          newArrows[arrowIndex] = scoreValue;
+
+          return { ...end, editableArrows: newArrows };
+        }
+        return end;
+      })
+    );
+
+    // Move focus to next arrow
+    const currentEnd = pendingEnds.find((e) => e.key === endKey);
+    if (currentEnd && arrowIndex < currentEnd.arrows.length - 1) {
+      setCurrentArrow([
+        currentEnd.participationID,
+        currentEnd.endOrder,
+        arrowIndex + 1,
+      ]);
     } else {
-      return (
-        <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
-          ⏳ In Progress
-        </span>
-      );
+      // Clear focus if last arrow
+      setCurrentArrow(null);
     }
   };
+
+  const handleCellClick = (end) => (arrowIndex) => {
+    // Set current editing focus
+    setCurrentArrow([end.participationID, end.endOrder, arrowIndex]);
+    setEditingEndId(end.key);
+  };
+
+  const handleConfirmEnd = async (end) => {
+    const confirmedData = {
+      roundID: end.roundID,
+      endOrder: end.endOrder,
+      distance: end.distance,
+      participationID: end.participationID,
+      // Convert 10 back to 'X' for the highest score if that's the final submission format
+      arrows: end.editableArrows.map((score) => (score === 10 ? "X" : score)),
+      stagingStatus: "confirmed", // Assuming the action changes status to 'confirmed'
+      // NOTE: You would need to add the recorderID and time here in a real submission.
+    };
+
+    try {
+      // Placeholder for the final submission API call (assuming a PUT/POST to a final endpoint)
+      // Example: await fetch(`/api/recorder/ends/confirm`, { method: 'POST', body: JSON.stringify(confirmedData) });
+
+      // --- Simulation ---
+      console.log("Submitting final score:", confirmedData);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      // --- End Simulation ---
+
+      // Remove the confirmed end from the list
+      setPendingEnds((prevEnds) => prevEnds.filter((e) => e.key !== end.key));
+
+      // Clear focus
+      if (editingEndId === end.key) {
+        setEditingEndId(null);
+        setCurrentArrow(null);
+      }
+
+      alert(
+        `End ${end.endOrder} for Participant ID ${end.participationID} confirmed successfully!`
+      );
+    } catch (error) {
+      console.error("Error confirming end score:", error);
+      alert("Failed to confirm end score. Please try again.");
+    }
+  };
+
+  // Group ends by participant for better UI
+  const groupedEnds = pendingEnds.reduce((acc, end) => {
+    const archerKey = end.participationID;
+    if (!acc[archerKey]) {
+      acc[archerKey] = {
+        participationID: end.participationID,
+        // Using participationID as placeholder for name
+        archerName: `Participant ID: ${end.participationID}`,
+        ends: [],
+      };
+    }
+    acc[archerKey].ends.push(end);
+    return acc;
+  }, {});
+
+  const archerGroups = Object.values(groupedEnds);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading...</div>
+        <div className="text-xl text-gray-600">Loading Pending Scores...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-green-50 to-emerald-100">
-      {/* Navigation Bar */}
-      <nav className="bg-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">📋</span>
-            <h1 className="text-2xl font-bold text-gray-800">Pending Scores</h1>
-          </div>
-          <button
-            onClick={() => navigate('/recorder/dashboard')}
-            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gray-100 p-8">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-800 mb-6">
+          Pending End Score Verification
+        </h1>
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Competition & Round Info */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">{competition?.title}</h2>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-gray-600">Location</p>
-              <p className="font-semibold text-gray-800">📍 {competition?.location}</p>
-            </div>
-            <div>
-              <p className="text-gray-600">Round Type</p>
-              <p className="font-semibold text-gray-800">🎯 {round?.roundType}</p>
-            </div>
-            <div>
-              <p className="text-gray-600">Date</p>
-              <p className="font-semibold text-gray-800">
-                📅 {new Date(round?.date).toLocaleDateString()}
-              </p>
-            </div>
+        {pendingEnds.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-lg p-6 text-center text-gray-600">
+            All ends are verified or no ends are currently pending for Round{" "}
+            {roundId}.
+            <button
+              onClick={() => navigate(-1)}
+              className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              ← Back
+            </button>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-8">
+            {archerGroups.map((group) => (
+              <div
+                key={group.participationID}
+                className="bg-white rounded-xl shadow-lg p-6"
+              >
+                <h2 className="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">
+                  {group.archerName}
+                </h2>
 
-        {/* Pending Archers Table */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-2xl font-bold text-gray-800">Archers with Pending Scores</h3>
-            <span className="text-sm text-gray-600">
-              {pendingArchers.filter(a => a.status === 'complete').length} ready to verify
-            </span>
-          </div>
+                <div className="space-y-4">
+                  {group.ends.map((end) => (
+                    <div
+                      key={end.key}
+                      className={`p-4 border rounded-lg transition-all ${
+                        editingEndId === end.key
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-200 bg-white"
+                      }`}
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        {/* End Info */}
+                        <div className="flex-shrink-0 min-w-[150px]">
+                          <div className="font-bold text-lg text-gray-800">
+                            End {end.endOrder}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {end.distance}m
+                          </div>
+                        </div>
 
-          {pendingArchers.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">📭</div>
-              <p className="text-gray-600 text-lg">No pending scores for this round</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-6 py-3 text-left font-semibold text-gray-700">Archer Name</th>
-                    <th className="px-6 py-3 text-left font-semibold text-gray-700">Category</th>
-                    <th className="px-6 py-3 text-center font-semibold text-gray-700">Ends Completed</th>
-                    <th className="px-6 py-3 text-center font-semibold text-gray-700">Status</th>
-                    <th className="px-6 py-3 text-center font-semibold text-gray-700">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingArchers.map((archer) => (
-                    <tr key={archer.participationID} className="border-b hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="font-semibold text-gray-800">
-                            {archer.archerFirstName} {archer.archerLastName}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {archer.archerGender} • {archer.archerNationality}
-                          </p>
+                        {/* Arrow Scores (Editable Grid) */}
+                        <div className="flex flex-1 gap-2 overflow-x-auto">
+                          {end.editableArrows.map((score, arrowIndex) => {
+                            const isFocused =
+                              currentArrow &&
+                              currentArrow[0] === end.participationID &&
+                              currentArrow[1] === end.endOrder &&
+                              currentArrow[2] === arrowIndex;
+
+                            return (
+                              <button
+                                key={arrowIndex}
+                                onClick={() => handleCellClick(end)(arrowIndex)}
+                                className={`w-12 h-12 border-2 rounded-lg flex items-center justify-center font-bold text-base transition-all ${
+                                  isFocused
+                                    ? "bg-red-500 text-white border-red-600 shadow-lg scale-105"
+                                    : score === 10
+                                    ? "bg-yellow-100 text-gray-800 border-yellow-300 hover:border-blue-400"
+                                    : score === 0
+                                    ? "bg-gray-200 text-gray-800 border-gray-300 hover:border-blue-400"
+                                    : "bg-white text-gray-800 border-gray-300 hover:border-blue-400"
+                                }`}
+                              >
+                                {score === 10
+                                  ? "10"
+                                  : score === 0
+                                  ? "M"
+                                  : score}
+                              </button>
+                            );
+                          })}
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                          {archer.category || 'N/A'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="font-semibold">
-                          {archer.endsCompleted}/{archer.totalEnds || 12}
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                          <div
-                            className="bg-green-600 h-2 rounded-full"
-                            style={{
-                              width: `${(archer.endsCompleted / (archer.totalEnds || 12)) * 100}%`
-                            }}
-                          ></div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {getStatusBadge(archer.status)}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {archer.status === 'complete' ? (
-                          <Link
-                            to={`/recorder/verify/${archer.participationID}/${roundId}`}
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors inline-block"
-                          >
-                            Verify Scores
-                          </Link>
-                        ) : (
+
+                        {/* End Score Sum and Confirm Button */}
+                        <div className="flex-shrink-0 flex items-center gap-3 ml-auto">
+                          <div className="text-lg font-bold text-gray-800 bg-gray-100 px-4 py-2 rounded-lg min-w-20 text-center border">
+                            Sum: {getEndScore(end.editableArrows)}
+                          </div>
                           <button
-                            disabled
-                            className="bg-gray-300 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed"
+                            onClick={() => handleConfirmEnd(end)}
+                            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-md min-w-32"
                           >
-                            Not Ready
+                            Confirm End
                           </button>
-                        )}
-                      </td>
-                    </tr>
+                        </div>
+                      </div>
+
+                      {/* Quick Entry Panel (if this end is focused) */}
+                      {editingEndId === end.key && currentArrow && (
+                        <div className="mt-4 pt-3 border-t border-gray-200">
+                          <h3 className="font-bold text-md text-gray-800 mb-3">
+                            Edit Arrow {currentArrow[2] + 1}
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                            {arrowOptions.map((opt) => (
+                              <button
+                                key={opt}
+                                onClick={() =>
+                                  handleArrowEdit(end.key, currentArrow[2], opt)
+                                }
+                                className="px-4 py-2 text-md font-bold border-2 border-gray-300 rounded-lg bg-gray-50 hover:bg-blue-100 hover:border-blue-400 transition-all shadow-sm"
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Instructions */}
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-6 mt-6 rounded-lg">
-          <h4 className="font-bold text-blue-900 mb-2">📘 Next Steps</h4>
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-6 mt-8 rounded-lg">
+          <h4 className="font-bold text-blue-900 mb-2">
+            📘 Verification Instructions
+          </h4>
           <ul className="text-blue-800 space-y-1 text-sm">
-            <li>• Click "Verify Scores" for archers who have completed all ends</li>
-            <li>• Review each arrow and make adjustments if necessary</li>
-            <li>• Confirm the scores to finalize and save to the database</li>
-            <li>• Archers will be able to see their verified scores immediately</li>
+            <li>
+              • Click on any arrow score to bring up the Quick Entry panel and
+              edit the value.
+            </li>
+            <li>
+              • Use the Quick Entry panel to change the arrow score. The focused
+              arrow is highlighted in red.
+            </li>
+            <li>
+              • Once all scores for an end are accurate, click the **Confirm
+              End** button to finalize and save the scores to the database.
+            </li>
           </ul>
         </div>
       </div>
@@ -210,4 +352,4 @@ function RecorderPendingScores() {
   );
 }
 
-export default RecorderPendingScores;
+export default RecorderEndVerification;

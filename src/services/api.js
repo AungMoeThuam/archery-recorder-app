@@ -41,17 +41,17 @@ export const api = {
     ),
 
   // Score endpoints
-  getScores: () => fetch(`${API_BASE_URL}/scores`).then(handleResponse),
+  // getScores: () => fetch(`${API_BASE_URL}/scores`).then(handleResponse),
 
-  getScoreDetails: (id) =>
-    fetch(`${API_BASE_URL}/scores/${id}`).then(handleResponse),
+  // getScoreDetails: (id) =>
+  //   fetch(`${API_BASE_URL}/scores/${id}`).then(handleResponse),
 
-  submitScore: (scoreData) =>
-    fetch(`${API_BASE_URL}/scores`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(scoreData),
-    }).then(handleResponse),
+  // submitScore: (scoreData) =>
+  //   fetch(`${API_BASE_URL}/scores`, {
+  //     method: "POST",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify(scoreData),
+  //   }).then(handleResponse),
 
   // Competition endpoints
   getCompetitions: () =>

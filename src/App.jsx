@@ -31,7 +31,7 @@ function App() {
           element={<ArcherScoreEntry />}
         />
         <Route
-          path="/archer/score-entry-photo/:competitionId/:roundId"
+          path="/archer/score-entry-photo/:competitionId/:roundId/:participationId"
           element={<ArcherScoreEntryPhoto />}
         />
         <Route
