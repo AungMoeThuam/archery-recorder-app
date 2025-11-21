@@ -16,6 +16,7 @@ export default function ArcherScoreEntry() {
   const [loading, setLoading] = useState(true);
   const [showRangeCompleteModal, setShowRangeCompleteModal] = useState(false);
   const [notEligible, setNotEligible] = useState(false);
+  const [detecting, setDetecting] = useState(false);
 
   const arrowOptions = [
     "M",
@@ -81,6 +82,9 @@ export default function ArcherScoreEntry() {
               endOrder: i + 1,
               arrows: Array(arrowsPerEnd).fill(null),
               submitted: false,
+              photo: null,
+              photoPreview: null,
+              scoresDetected: false,
             })),
           };
         }),
@@ -199,6 +203,106 @@ export default function ArcherScoreEntry() {
     return Number.isNaN(n) ? 0 : n;
   };
 
+  /* --- Photo Handling and Detection --- */
+
+  const handlePhotoUpload = (rangeIndex, endIndex, event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload an image file");
+      return;
+    }
+
+    // Update scores object with photo file and preview URL
+    const updatedScores = JSON.parse(JSON.stringify(scoresObj));
+    const end = updatedScores.ranges[rangeIndex].ends[endIndex];
+
+    // Revoke previous preview URL if exists
+    if (end.photoPreview) {
+      URL.revokeObjectURL(end.photoPreview);
+    }
+
+    end.photo = file;
+    end.photoPreview = URL.createObjectURL(file);
+    end.scoresDetected = false;
+
+    setScoresObj(updatedScores);
+  };
+
+  const removePhoto = (rangeIndex, endIndex) => {
+    const updatedScores = JSON.parse(JSON.stringify(scoresObj));
+    const end = updatedScores.ranges[rangeIndex].ends[endIndex];
+
+    if (end.photoPreview) {
+      URL.revokeObjectURL(end.photoPreview);
+    }
+
+    end.photo = null;
+    end.photoPreview = null;
+    end.scoresDetected = false;
+
+    setScoresObj(updatedScores);
+  };
+
+  const handleDetectScores = async (rangeIndex, endIndex) => {
+    const endData = scoresObj.ranges[rangeIndex].ends[endIndex];
+    if (!endData.photo) return;
+
+    setDetecting(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", endData.photo);
+
+      const apiUrl = `http://localhost:8000/api/archer/1/detect`;
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Detection failed with status ${response.status}: ${errorText}`
+        );
+      }
+
+      const detectedScores = await response.json();
+
+      if (!Array.isArray(detectedScores)) {
+        throw new Error("Backend did not return a valid list of scores.");
+      }
+
+      const receivedScores = detectedScores.slice(0, endData.arrows.length);
+
+      // Update state with detected scores
+      const updatedScores = JSON.parse(JSON.stringify(scoresObj));
+      const updatedEnd = updatedScores.ranges[rangeIndex].ends[endIndex];
+
+      updatedEnd.arrows = receivedScores;
+      updatedEnd.scoresDetected = true;
+      setScoresObj(updatedScores);
+
+      // Save to localStorage
+      const storageKey = `scores_round_${roundId}`;
+      localStorage.setItem(storageKey, JSON.stringify(updatedScores));
+
+      // Set focus to this end for review/editing
+      setCurrentRangeIndex(rangeIndex);
+      setCurrentEnd(updatedEnd.endOrder);
+      setCurrentArrow(1);
+    } catch (error) {
+      console.error("Score detection failed:", error);
+      alert(`Score detection failed: ${error.message || "Unknown error"}`);
+    } finally {
+      setDetecting(false);
+    }
+  };
+
+  /* --- Score Entry and Submission Logic --- */
+
   const handleEnterScore = (score) => {
     if (!scoresObj || currentRangeIndex === null) return;
 
@@ -211,8 +315,10 @@ export default function ArcherScoreEntry() {
       return;
     }
 
-    // Deep clone the scores object
-    const updatedScores = JSON.parse(JSON.stringify(scoresObj));
+    // Clone the scores object (preserve photo File objects)
+    const updatedScores = structuredClone
+      ? structuredClone(scoresObj)
+      : JSON.parse(JSON.stringify(scoresObj));
     const updatedRangeData = updatedScores.ranges[currentRangeIndex];
     const updatedEndData = updatedRangeData.ends[currentEnd - 1];
 
@@ -309,9 +415,9 @@ export default function ArcherScoreEntry() {
     const endData = scoresObj.ranges[rangeIndex]?.ends[endNum - 1];
     if (!endData) return false;
 
-    // Check if all arrows are filled
+    // Check if all arrows are filled (allow 0, "M", but not null/undefined)
     for (const arrow of endData.arrows) {
-      if (!arrow) {
+      if (arrow === null || arrow === undefined) {
         return false;
       }
     }
@@ -579,91 +685,184 @@ export default function ArcherScoreEntry() {
             {/* Score Grid */}
             <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-6">
               <div className="space-y-4">
-                {scoresObj.ranges[currentRangeIndex].ends.map((endData) => {
-                  const endNum = endData.endOrder;
-                  const isSubmitted = endData.submitted;
-                  const isUnlocked = isEndUnlocked(currentRangeIndex, endNum);
-                  const isComplete = isEndComplete(currentRangeIndex, endNum);
-                  const canSubmit = isComplete && !isSubmitted;
+                {scoresObj.ranges[currentRangeIndex].ends.map(
+                  (endData, endIndex) => {
+                    const endNum = endData.endOrder;
+                    const isSubmitted = endData.submitted;
+                    const isUnlocked = isEndUnlocked(currentRangeIndex, endNum);
+                    const isComplete = isEndComplete(currentRangeIndex, endNum);
+                    const canSubmit = isComplete && !isSubmitted;
+                    const hasPhoto = endData.photo !== null;
+                    const isDetected = endData.scoresDetected;
 
-                  return (
-                    <div
-                      key={endNum}
-                      className={`flex items-center gap-4 p-3 rounded-lg transition-all ${
-                        isSubmitted
-                          ? "bg-green-50 border-2 border-green-300"
-                          : !isUnlocked
-                          ? "bg-gray-100 opacity-60"
-                          : "bg-white"
-                      }`}
-                    >
-                      <div className="w-20 font-bold text-gray-700 flex items-center gap-2">
-                        {isSubmitted && (
-                          <span className="text-green-600 text-xl">✓</span>
-                        )}
-                        {!isUnlocked && !isSubmitted && (
-                          <span className="text-gray-400 text-xl">🔒</span>
-                        )}
-                        End {endNum}
-                      </div>
-                      <div className="flex gap-2 flex-1">
-                        {endData.arrows.map((val, arrowIndex) => {
-                          const selected =
-                            currentEnd === endNum &&
-                            currentArrow === arrowIndex + 1 &&
-                            !isSubmitted;
-                          const canClick = isUnlocked && !isSubmitted;
+                    return (
+                      <div
+                        key={endNum}
+                        className={`flex flex-col gap-3 p-3 rounded-lg transition-all ${
+                          isSubmitted
+                            ? "bg-green-50 border-2 border-green-300"
+                            : !isUnlocked
+                            ? "bg-gray-100 opacity-60"
+                            : "bg-white border-2 border-gray-200"
+                        }`}
+                      >
+                        {/* Main Row: End Label + Arrows + Sum + Submit */}
+                        <div className="flex items-center gap-4">
+                          <div className="w-20 font-bold text-gray-700 flex items-center gap-2">
+                            {isSubmitted && (
+                              <span className="text-green-600 text-xl">✓</span>
+                            )}
+                            {!isUnlocked && !isSubmitted && (
+                              <span className="text-gray-400 text-xl">🔒</span>
+                            )}
+                            End {endNum}
+                          </div>
+                          <div className="flex gap-2 flex-1">
+                            {endData.arrows.map((val, arrowIndex) => {
+                              const selected =
+                                currentEnd === endNum &&
+                                currentArrow === arrowIndex + 1 &&
+                                !isSubmitted;
+                              const canClick = isUnlocked && !isSubmitted;
 
-                          return (
+                              return (
+                                <button
+                                  key={arrowIndex}
+                                  onClick={() =>
+                                    handleCellClick(
+                                      currentRangeIndex,
+                                      endNum,
+                                      arrowIndex
+                                    )
+                                  }
+                                  disabled={!canClick}
+                                  className={
+                                    "w-14 h-14 border-2 rounded-lg flex items-center justify-center font-bold text-lg transition-all " +
+                                    (selected
+                                      ? "bg-blue-600 text-white border-blue-700 shadow-lg scale-110"
+                                      : isSubmitted
+                                      ? "bg-green-100 text-gray-800 border-green-300 cursor-not-allowed"
+                                      : !canClick
+                                      ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                      : val
+                                      ? "bg-white text-gray-800 border-gray-300 hover:border-blue-400"
+                                      : "bg-white text-gray-400 border-gray-200 hover:border-blue-300")
+                                  }
+                                >
+                                  {val || "-"}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="ml-4 text-sm font-bold text-gray-700 bg-white px-4 py-2 rounded-lg border-2 border-gray-200 min-w-20 text-center">
+                            Sum: {getEndScore(currentRangeIndex, endNum)}
+                          </div>
+                          {canSubmit && (
                             <button
-                              key={arrowIndex}
                               onClick={() =>
-                                handleCellClick(
-                                  currentRangeIndex,
-                                  endNum,
-                                  arrowIndex
-                                )
+                                handleSubmitEnd(currentRangeIndex, endNum)
                               }
-                              disabled={!canClick}
-                              className={
-                                "w-14 h-14 border-2 rounded-lg flex items-center justify-center font-bold text-lg transition-all " +
-                                (selected
-                                  ? "bg-blue-600 text-white border-blue-700 shadow-lg scale-110"
-                                  : isSubmitted
-                                  ? "bg-green-100 text-gray-800 border-green-300 cursor-not-allowed"
-                                  : !canClick
-                                  ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                                  : val
-                                  ? "bg-white text-gray-800 border-gray-300 hover:border-blue-400"
-                                  : "bg-white text-gray-400 border-gray-200 hover:border-blue-300")
-                              }
+                              className="ml-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-md"
                             >
-                              {val || "-"}
+                              Submit End
                             </button>
-                          );
-                        })}
-                      </div>
-                      <div className="ml-4 text-sm font-bold text-gray-700 bg-white px-4 py-2 rounded-lg border-2 border-gray-200 min-w-20 text-center">
-                        Sum: {getEndScore(currentRangeIndex, endNum)}
-                      </div>
-                      {canSubmit && (
-                        <button
-                          onClick={() =>
-                            handleSubmitEnd(currentRangeIndex, endNum)
-                          }
-                          className="ml-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-md"
-                        >
-                          Submit End
-                        </button>
-                      )}
-                      {isSubmitted && (
-                        <div className="ml-2 text-green-600 font-semibold px-4 py-2">
-                          Submitted
+                          )}
+                          {isSubmitted && (
+                            <div className="ml-2 text-green-600 font-semibold px-4 py-2">
+                              Submitted
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+
+                        {/* Photo Upload Row (Only show if not submitted) */}
+                        {!isSubmitted && isUnlocked && (
+                          <div className="flex items-center gap-3 pl-24">
+                            {!hasPhoto ? (
+                              <label className="cursor-pointer">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) =>
+                                    handlePhotoUpload(
+                                      currentRangeIndex,
+                                      endIndex,
+                                      e
+                                    )
+                                  }
+                                  className="hidden"
+                                />
+                                <div className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-blue-400 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors text-blue-700 font-semibold text-sm">
+                                  <span>📷 Enter Score via Photo</span>
+                                </div>
+                              </label>
+                            ) : (
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={endData.photoPreview}
+                                  alt={`End ${endNum}`}
+                                  className="w-12 h-12 object-cover rounded-lg border-2 border-gray-300"
+                                />
+                                <button
+                                  onClick={() =>
+                                    removePhoto(currentRangeIndex, endIndex)
+                                  }
+                                  className="text-red-600 hover:text-red-800 text-sm font-semibold"
+                                >
+                                  Remove
+                                </button>
+                                {!isDetected && (
+                                  <button
+                                    onClick={() =>
+                                      handleDetectScores(
+                                        currentRangeIndex,
+                                        endIndex
+                                      )
+                                    }
+                                    disabled={detecting}
+                                    className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors font-semibold shadow-md flex items-center gap-2 text-sm"
+                                  >
+                                    {detecting ? (
+                                      <>
+                                        <svg
+                                          className="animate-spin h-4 w-4 text-white"
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <circle
+                                            className="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            strokeWidth="4"
+                                          ></circle>
+                                          <path
+                                            className="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                          ></path>
+                                        </svg>
+                                        Detecting...
+                                      </>
+                                    ) : (
+                                      "Detect Scores"
+                                    )}
+                                  </button>
+                                )}
+                                {isDetected && (
+                                  <span className="text-green-600 font-semibold text-sm">
+                                    ✓ Scores Detected
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                )}
               </div>
             </div>
           </div>
