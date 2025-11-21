@@ -254,8 +254,10 @@ export default function ArcherScoreEntry() {
     try {
       const formData = new FormData();
       formData.append("file", endData.photo);
-
-      const apiUrl = `http://localhost:8000/api/archer/1/detect`;
+      const currentRangeID = scoresObj.ranges[rangeIndex].rangeID;
+      const apiUrl = `${
+        import.meta.env.VITE_API_IMAGE_DETECT
+      }/api/archer/${currentRangeID}/detect`;
 
       const response = await fetch(apiUrl, {
         method: "POST",
