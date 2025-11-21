@@ -65,41 +65,97 @@ export default function ArcherScoreEntry() {
       const rangeList = rangesData.ranges || [];
       setRanges(rangeList);
 
-      // Try to load existing data from localStorage
+      // Initialize new structure with ranges
+      const newScoresObj = {
+        participationID: parseInt(participationId),
+        roundID: parseInt(roundId),
+        ranges: rangeList.map((range) => {
+          const arrowsPerEnd = range.rangeTotalArrowsPerEnd || 3;
+          const totalEnds = range.rangeTotalEnds || 1;
+
+          return {
+            distance: range.rangeDistance,
+            target: range.rangeTargetSize,
+            rangeID: range.rangeID,
+            ends: Array.from({ length: totalEnds }, (_, i) => ({
+              endOrder: i + 1,
+              arrows: Array(arrowsPerEnd).fill(null),
+              submitted: false,
+            })),
+          };
+        }),
+      };
+
+      // Fetch submitted scores from backend
+      try {
+        const submittedData = await api.getArcherSubmittedScores(
+          participationId,
+          roundId
+        );
+        const submittedEnds = submittedData.submittedEnds || [];
+
+        // Merge submitted scores into the structure
+        submittedEnds.forEach((submittedEnd) => {
+          // Find matching range by distance
+          const rangeIndex = newScoresObj.ranges.findIndex(
+            (r) => r.distance === submittedEnd.distance.toString()
+          );
+
+          if (rangeIndex !== -1) {
+            const range = newScoresObj.ranges[rangeIndex];
+            const endIndex = range.ends.findIndex(
+              (e) => e.endOrder === submittedEnd.endOrder
+            );
+
+            if (endIndex !== -1) {
+              // Update the end with submitted data
+              range.ends[endIndex] = {
+                endOrder: submittedEnd.endOrder,
+                arrows: submittedEnd.arrows.map((arrow) => arrow.toString()),
+                submitted: true,
+              };
+            }
+          }
+        });
+      } catch (error) {
+        console.error("Failed to fetch submitted scores:", error);
+        // Continue with empty structure if fetch fails
+      }
+
+      // Try to load draft data from localStorage for unsubmitted ends
       const storageKey = `scores_round_${roundId}`;
       const savedData = localStorage.getItem(storageKey);
 
-      let loadedScoresObj;
+      let loadedScoresObj = newScoresObj;
 
       if (savedData) {
-        // Load from localStorage if exists
-        loadedScoresObj = JSON.parse(savedData);
-        setScoresObj(loadedScoresObj);
-      } else {
-        // Initialize new structure
-        const newScoresObj = {
-          participationID: parseInt(participationId),
-          roundID: parseInt(roundId),
-          ranges: rangeList.map((range) => {
-            const arrowsPerEnd = range.rangeTotalArrowsPerEnd || 3;
-            const totalEnds = range.rangeTotalEnds || 1;
+        try {
+          const localData = JSON.parse(savedData);
 
-            return {
-              distance: range.rangeDistance,
-              target: range.rangeTargetSize,
-              rangeID: range.rangeID,
-              ends: Array.from({ length: totalEnds }, (_, i) => ({
-                endOrder: i + 1,
-                arrows: Array(arrowsPerEnd).fill(null),
-                submitted: false,
-              })),
-            };
-          }),
-        };
+          // Merge localStorage data for unsubmitted ends only
+          localData.ranges.forEach((localRange, rangeIndex) => {
+            if (newScoresObj.ranges[rangeIndex]) {
+              localRange.ends.forEach((localEnd, endIndex) => {
+                const currentEnd =
+                  newScoresObj.ranges[rangeIndex].ends[endIndex];
 
-        loadedScoresObj = newScoresObj;
-        setScoresObj(newScoresObj);
+                // Only use localStorage data if the end is NOT submitted in backend
+                if (
+                  currentEnd &&
+                  !currentEnd.submitted &&
+                  !localEnd.submitted
+                ) {
+                  currentEnd.arrows = localEnd.arrows;
+                }
+              });
+            }
+          });
+        } catch (error) {
+          console.error("Failed to parse localStorage data:", error);
+        }
       }
+
+      setScoresObj(loadedScoresObj);
 
       if (rangeList.length > 0 && loadedScoresObj) {
         // Find the first unsubmitted end across all ranges

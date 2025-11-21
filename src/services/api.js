@@ -82,6 +82,11 @@ export const api = {
       body: JSON.stringify(endScoreData),
     }).then(handleResponse),
 
+  getArcherSubmittedScores: (participationID, roundID) =>
+    fetch(
+      `${API_BASE_URL}/api/archer/round/submitted-scores?participationID=${participationID}&roundID=${roundID}`
+    ).then(handleResponse),
+
   // Recorder endpoints
   getPendingScores: () =>
     fetch(`${API_BASE_URL}/scores/pending`).then(handleResponse),
